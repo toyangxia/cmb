@@ -81,6 +81,7 @@ public class CQSControllerServlet extends CMBControllerServlet {
         
             initPersistence();
             initActions();
+            CQSActiveActiveController.getInstance().init();
 
             MBeanServer mbs = ManagementFactory.getPlatformMBeanServer(); 
             ObjectName name = new ObjectName("com.comcast.cqs.controller:type=CQSMonitorMBean");
@@ -115,6 +116,7 @@ public class CQSControllerServlet extends CMBControllerServlet {
         final CQSSetQueueAttributesAction setQueueAttributesAction = new CQSSetQueueAttributesAction();
         final CQSClearQueueAction clearQueueAction = new CQSClearQueueAction();
         final CQSPeekMessageAction peekMessageAction = new CQSPeekMessageAction();
+        final CQSPollMessageIdsAction pollMessageIdsAction = new CQSPollMessageIdsAction();
         final CQSGetAPIStatsAction getAPIStats = new CQSGetAPIStatsAction();
         final HealthCheckShallow healthCheckShallow = new HealthCheckShallow();
         final CQSManageServiceAction clearCache = new CQSManageServiceAction();
@@ -127,6 +129,7 @@ public class CQSControllerServlet extends CMBControllerServlet {
             put(sendMessageAction.getName(), sendMessageAction);
             put(receiveMessageAction.getName(), receiveMessageAction);
             put(peekMessageAction.getName(), peekMessageAction);
+            put(pollMessageIdsAction.getName(), pollMessageIdsAction);
             put(deleteMessageAction.getName(), deleteMessageAction);
             put(changeMessageVisibilityAction.getName(), changeMessageVisibilityAction);
             put(receiveMessageBodyAction.getName(), receiveMessageBodyAction);
@@ -256,6 +259,7 @@ public class CQSControllerServlet extends CMBControllerServlet {
             
             RedisCachedCassandraPersistence.executor.shutdown();
             RedisCachedCassandraPersistence.revisibilityExecutor.shutdown();
+            CQSActiveActiveController.getInstance().executor.shutdown();
             CQSLongPollSender.shutdown();
             CQSLongPollReceiver.shutdown();
             

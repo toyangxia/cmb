@@ -171,6 +171,12 @@ public class CMBProperties {
     private final boolean cnsServiceEnabled;
     private final boolean cqsServiceEnabled;
     
+    private final int activeActiveFrequencySeconds;
+    private final int pollMessageIdsMaxNum;
+    private final int activeActivePoolSize;
+    private final int activeSwitchCheckFrequencySeconds;
+    
+    
     // these are configs for the CNSPublisher tool
     
     private final int numEPPubJobProducers;
@@ -295,6 +301,11 @@ public class CMBProperties {
             requireSubscriptionConfirmation = Boolean.parseBoolean(props.getProperty("cmb.cns.requireSubscriptionConfirmation", "true"));
             cnsServiceEnabled = Boolean.parseBoolean(props.getProperty("cmb.cns.serviceEnabled", "true"));
             cqsServiceEnabled = Boolean.parseBoolean(props.getProperty("cmb.cqs.serviceEnabled", "true"));
+            
+            activeActiveFrequencySeconds = Integer.parseInt(props.getProperty("cmb.cqs.activeActiveFrequencySeconds", "10"));
+            pollMessageIdsMaxNum = Integer.parseInt(props.getProperty("cmb.cqs.pollMessageIdsMaxNum", "10"));
+            activeActivePoolSize = Integer.parseInt(props.getProperty("cmb.cqs.activeActivePoolSize", "10"));
+            activeSwitchCheckFrequencySeconds = Integer.parseInt(props.getProperty("cmb.cqs.activeSwitchCheckFrequencySeconds", "60"));
             
             cnsMaxMsgSize = Integer.parseInt(props.getProperty("cmb.cns.maxMsgSize", "65536"));
             
@@ -468,6 +479,22 @@ public class CMBProperties {
         return cnsServiceEnabled;
     }
 
+    public int getActiveActiveFrequencySeconds() {
+        return activeActiveFrequencySeconds;
+    }
+    
+    public int getPollMessageIdsMaxNum(){
+    	return pollMessageIdsMaxNum;
+    }
+    
+    public int getActiveActivePoolSize() {
+        return activeActivePoolSize;
+    }
+ 
+    public int getActiveSwitchCheckFrequencySeconds() {
+        return activeSwitchCheckFrequencySeconds;
+    }
+    
     public boolean getCQSServiceEnabled() {
         return cqsServiceEnabled;
     }

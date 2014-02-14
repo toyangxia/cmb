@@ -53,6 +53,9 @@ public class CQSDeleteQueueAction extends CQSAction {
             PersistenceFactory.getCQSMessagePersistence().clearQueue(queue.getRelativeUrl(), shard);
         }
         
+        //for Active Active, timestamp for poll message Id request
+        CQSActiveActiveController.getInstance().removePollMessageIdTimeStamp(queue.getRelativeUrl());
+        
         String out = CQSQueuePopulator.getDeleteQueueResponse();
         writeResponse(out, response);
         

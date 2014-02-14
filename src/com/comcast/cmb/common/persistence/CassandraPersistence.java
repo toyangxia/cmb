@@ -725,6 +725,41 @@ public class CassandraPersistence {
 	}
 
 	/**
+	 * Read single column value by row key.
+	 * 
+	 * @param columnFamily
+	 *            column family
+	 * @param key
+	 *            row key
+	 * @param numCols
+	 *            maximum number of columns
+	 * @param keySerializer
+	 * @param columnNameSerializer
+	 * @param valueSerializer
+	 * @param level
+	 *            consistency level
+	 * @param columnName 
+	 * @return column value
+	 */
+	public String readColumnString(String columnFamily, String key, int numCols, 
+			HConsistencyLevel level, String columnName) {
+
+		ColumnSlice<String, String> slice = readColumnSlice (columnFamily, key, numCols,
+				StringSerializer.get(), StringSerializer.get(), StringSerializer.get(), level);
+		if (slice == null || slice.getColumns() == null || slice.getColumns().size() < 1) {
+			return null;
+		}
+		String columnValue = null;
+		
+		if (slice.getColumnByName(columnName) != null) {
+			columnValue = slice.getColumnByName(columnName).getValue();
+		} else {
+			return null;
+		}
+		return columnValue;
+	}
+	
+	/**
 	 * Read single row by row key.
 	 * 
 	 * @param columnFamily

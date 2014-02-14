@@ -1530,6 +1530,52 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
     	return messageCount;
     }
 
+    public List<String> pollMessageIds(CQSQueue queue, int maxNumIds, int remoteQueueDepth) {
+    	//rules to check whether should return result
+    	long localQueueDepth=RedisCachedCassandraPersistence.getInstance().getQueueMessageCount(queue.getRelativeUrl());
+    	
+    	int shard = rand.nextInt(queue.getNumberOfShards());
+    	//check if current cache is available, this info can be used for fail over check.
+    	boolean cacheAvailable = checkCacheConsistency(queue.getRelativeUrl(), shard, false);
+    	if(cacheAvailable==false){
+    		return Collections.emptyList();
+    	}
+        //rules to check if it is Okay to return ids, including compare with current Datacenter queue depth
+        //cut from redis list
+    	List<String> messageIds = new LinkedList<String>();
+        boolean brokenJedis = false;
+        if((localQueueDepth>0)&&(localQueueDepth>10*remoteQueueDepth)){
+        	ShardedJedis jedis = null;
+            try {
+                
+            	jedis = getResource();
+            	boolean emptyQueue = false;
+                
+                String memId;
+                for (int i = 0; i < maxNumIds && !emptyQueue; i++) {
+                	memId = jedis.lpop(queue.getRelativeUrl() + "-" + shard + "-Q");
+                    if (memId == null || memId.equals("nil")) { //done
+                        emptyQueue = true;
+                    } else {
+                        messageIds.add(memId);
+                    }
+                }
+                
+
+
+            }catch (Exception e){
+                brokenJedis = true;
+        		logger.error(e);
+        		
+            }finally{
+            	returnResource(jedis, brokenJedis);
+            }
+        }
+        if (messageIds.size() == 0) {
+            return Collections.emptyList();
+        } 
+        return messageIds;
+    }
     /**
      * This method get the count from redis based ont he suffix
      * @param queueUrl
@@ -1765,5 +1811,32 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
 	    }
     	
     	return atLeastOneShardIsUp;
+	}
+	
+	public void setMessageIds(CQSQueue queue, List<String> messageIdList){
+		ShardedJedis jedis = null;
+		if(messageIdList.size()>0){
+			
+			int shard=0;
+			if (queue.getNumberOfShards() > 1) {
+				shard = rand.nextInt(queue.getNumberOfShards());
+			}
+			boolean brokenJedis =false;
+			try{
+				jedis = getResource();
+			
+			for (String memId : messageIdList){
+				jedis.rpush(queue.getRelativeUrl() + "-" + shard + "-Q", memId);
+			}
+			}catch (JedisConnectionException e) {
+	            logger.warn("event=set_message error_code=redis_unavailable num_connections=" + numRedisConnections.get());
+	            brokenJedis = true;
+	            trySettingCacheState(queue.getRelativeUrl(), shard, QCacheState.Unavailable);
+	        } finally {
+	            if (jedis != null) {
+	                returnResource(jedis, brokenJedis);
+	            }
+	        }
+		}
 	}
 }

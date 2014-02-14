@@ -15,26 +15,46 @@
  */
 package com.comcast.cqs.controller;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.w3c.dom.Element;
 
+import com.amazonaws.Request;
+import com.amazonaws.auth.AWS4Signer;
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.services.sqs.model.CreateQueueRequest;
+import com.amazonaws.services.sqs.model.transform.CreateQueueRequestMarshaller;
 import com.comcast.cmb.common.model.User;
 import com.comcast.cmb.common.persistence.PersistenceFactory;
 import com.comcast.cmb.common.util.CMBErrorCodes;
 import com.comcast.cmb.common.util.CMBException;
 import com.comcast.cmb.common.util.CMBProperties;
+import com.comcast.cmb.common.util.XmlUtil;
 import com.comcast.cqs.io.CQSMessagePopulator;
 import com.comcast.cqs.model.CQSMessage;
 import com.comcast.cqs.model.CQSQueue;
+import com.comcast.cqs.persistence.RedisCachedCassandraPersistence;
 import com.comcast.cqs.util.CQSConstants;
+
 /**
  * Receive message
  * @author aseem, baosen, bwolf, vvenkatraman
@@ -149,6 +169,153 @@ public class CQSReceiveMessageAction extends CQSAction {
             writeResponse(out, response);
         }
         
+		// for ActiveActive, if previous pollMessageIds call time stamp is older
+		// than n seconds, kick async call to poll message ID from other Data
+		// center
+		try {
+			if (CQSActiveActiveController.getInstance().getActiveActiveSwitch()) {
+				int activeActiveFrequencySeconds = CMBProperties.getInstance()
+						.getActiveActiveFrequencySeconds();
+				Calendar calendarMinusFrequencySec = Calendar.getInstance();
+				calendarMinusFrequencySec.add(Calendar.SECOND,
+						0 - activeActiveFrequencySeconds);
+				Calendar lastPollMessageIdTimestamp = CQSActiveActiveController
+						.getInstance().getPollMessageIdTimeStamp(
+								queue.getRelativeUrl());
+				if ((lastPollMessageIdTimestamp == null)
+						|| ((queue.isActiveActive()) && (lastPollMessageIdTimestamp
+								.before(calendarMinusFrequencySec)))) {
+					// kick async calls
+					CQSActiveActiveController.getInstance().executor
+							.submit(new PollMessageIdsRunnable(queue, user));
+					CQSActiveActiveController.getInstance()
+							.setPollMessageIdTimeStamp(queue.getRelativeUrl(),
+									Calendar.getInstance());
+				}
+			}
+		} catch (Exception e) {
+			logger.error("event=active_active_exception " + e);
+		}
+
         return messageList != null && messageList.size() > 0 ? true : false;
     }
+	
+
+	private class PollMessageIdsRunnable implements Runnable {
+		private final CQSQueue queue;
+		private final User user;
+		public PollMessageIdsRunnable(CQSQueue queue, User user){
+			this.queue=queue;
+			this.user=user;
+		}
+	    public void run() {
+	        //get max number, local queue depth
+	    	int maxNumIds = CMBProperties.getInstance().getPollMessageIdsMaxNum();
+	    	try{
+	    		int localQueueDepth = (int)RedisCachedCassandraPersistence.getInstance().getQueueMessageCount(queue.getRelativeUrl(), true);
+
+	    		//kick the call
+		    		for(String cqsRemoteDatacenterUrl:CQSActiveActiveController.getInstance().getOtherDcURLs()){
+						String pollMessageIdsRequestUrl = cqsRemoteDatacenterUrl + queue.getRelativeUrl()+ "?Action=PollMessageIds&MaxNumIds="+maxNumIds+"&LocalQueueDepth="+localQueueDepth+"&AWSAccessKeyId=" + user.getAccessKey();
+						AWSCredentials awsCredentials=new BasicAWSCredentials(user.getAccessKey(),user.getAccessSecret());
+						String pollMessageIdXml = httpPOST(cqsRemoteDatacenterUrl, pollMessageIdsRequestUrl,awsCredentials);
+						Element root = XmlUtil.buildDoc(pollMessageIdXml);
+						List<Element> messageIdElements = XmlUtil.getCurrentLevelChildNodes(XmlUtil.getCurrentLevelChildNodes(root, "PollMessageIdsResult").get(0), "Message");
+						List <String> messageIdList= new LinkedList<String>();
+						for (Element messageIdElement : messageIdElements) {
+							messageIdList.add(XmlUtil.getCurrentLevelTextValue(messageIdElement, "MessageId"));
+						}
+
+						StringBuffer sb=new StringBuffer();
+						for (String messageId: messageIdList){
+							sb.append(messageId+ ",");
+						}
+						logger.info("event=pollmessageid_returned result:"+sb);
+						//if not null, add to Redis
+						if (messageIdList.size()>0){
+							RedisCachedCassandraPersistence.getInstance().setMessageIds(queue, messageIdList);
+						}
+		    		}
+	    	} catch(Exception e){
+	    		logger.error(e);
+	    	}
+	    	//call remote Data center load balancer
+	    	//add result to current Redis
+	    }
+
+	    protected String httpPOST(String baseUrl, String urlString, AWSCredentials awsCredentials) {
+	        
+	    	URL url;
+	    	HttpURLConnection conn;
+	    	BufferedReader br;
+	    	String line;
+	    	String doc = "";
+
+	    	try {
+
+	    		String urlPost=urlString.substring(0,urlString.indexOf("?"));
+	    		url =new URL(urlPost);
+	    		conn = (HttpURLConnection)url.openConnection();
+	    		conn.setRequestMethod("POST");
+	    		
+	    		CreateQueueRequest createQueueRequest = new CreateQueueRequest("test");
+	    		Request<CreateQueueRequest> request = new CreateQueueRequestMarshaller().marshall(createQueueRequest);
+	    		//set parameters from url
+	    		String parameterString= urlString.substring(urlString.indexOf("?")+1);
+	    		String []parameterArray=parameterString.split("&");
+	    		Map <String, String> requestParameters=new HashMap<String, String>();
+	    		for(int i=0; i<parameterArray.length;i++){
+	    			requestParameters.put(parameterArray[i].substring(0,parameterArray[i].indexOf("=")), 
+	    					parameterArray[i].substring(parameterArray[i].indexOf("=")+1));
+	    		}
+	    		request.setParameters(requestParameters);
+	    		//get endpoint from url
+	    		URI uri = new URI(baseUrl);
+	    		request.setEndpoint(uri);
+	    		String resourcePath=urlString.substring(baseUrl.length(), urlString.indexOf("?"));
+	    		request.setResourcePath(resourcePath);
+	    		
+	    		AWS4Signer aws4Signer=new AWS4Signer();
+	    		String host = uri.getHost();
+	    		aws4Signer.setServiceName(host);
+	    		aws4Signer.sign(request, awsCredentials);
+	    		
+	    		//set headers for real request
+	    		for (Entry <String, String>entry:request.getHeaders().entrySet()){
+	    			conn.setRequestProperty(entry.getKey(),entry.getValue());	
+	    		}
+	    		
+	    		// Send post request
+	    		conn.setDoOutput(true);
+	    		DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
+	    		StringBuffer bodyStringBuffer=new StringBuffer();
+	    		for(Entry <String, String> entry:requestParameters.entrySet()){
+	    			bodyStringBuffer.append(entry.getKey()+"="+entry.getValue()+"&");
+	    		}
+	    		String bodyString="";
+	    		if(bodyStringBuffer.length()>0){
+	    			bodyString=bodyStringBuffer.substring(0, bodyStringBuffer.length()-1);
+	    		}
+	    		wr.writeBytes(bodyString);
+	    		wr.flush();
+	    		wr.close();
+	    		
+	    		br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+
+	    		while ((line = br.readLine()) != null) {
+	    			doc += line;
+	    		}
+
+	    		br.close();
+
+	    		logger.info("event=http_get url=" + urlString);
+
+	    	} catch (Exception ex) {
+	    		logger.error("event=http_get url=" + urlString, ex);
+	    	}
+
+	    	return doc;
+	    }
+	}
+
 }

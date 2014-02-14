@@ -49,6 +49,7 @@ public class CQSConstants {
 	public static final String NUMBER_OF_PARTITIONS = "NumberOfPartitions";
 	public static final String NUMBER_OF_SHARDS = "NumberOfShards";
 	public static final String IS_COMPRESSED = "IsCompressed";
+	public static final String IS_ACTIVEACTIVE = "IsActiveActive";
 
     public static final String REDIS_APPROXIMATE_FIRST_RECEIVE_TIMESTAMP = "AFRTS";	
 	public static final String REDIS_APPROXIMATE_RECEIVE_COUNT = "ARC";
@@ -70,4 +71,5 @@ public class CQSConstants {
 	public static final String COL_NUMBER_PARTITIONS = "numPartitions";
 	public static final String COL_NUMBER_SHARDS = "numShards";
 	public static final String COL_COMPRESSED = "compressed";
+	public static final String COL_ACTIVEACTIVE = "activeActive";
 }

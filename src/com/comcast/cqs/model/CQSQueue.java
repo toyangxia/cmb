@@ -43,6 +43,7 @@ public class CQSQueue {
     private int numberOfPartitions = 100;
     private int numberOfShards = 1;
     private boolean compressed = false;
+    private boolean activeActive = false;
     
 	public CQSQueue(String name, String ownerId) {
     	
@@ -58,6 +59,7 @@ public class CQSQueue {
         this.numberOfPartitions = CMBProperties.getInstance().getCQSNumberOfQueuePartitions();
         this.numberOfShards = 1;
         this.compressed = false;
+        this.activeActive = false;
 	}
 	
 	public boolean isCompressed() {
@@ -66,6 +68,14 @@ public class CQSQueue {
 
 	public void setCompressed(boolean compressed) {
 		this.compressed = compressed;
+	}
+	
+	public boolean isActiveActive() {
+		return activeActive;
+	}
+
+	public void setActiveActive(boolean activeActive) {
+		this.activeActive = activeActive;
 	}
 
 	@Override 

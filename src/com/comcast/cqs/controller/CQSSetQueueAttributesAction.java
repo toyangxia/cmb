@@ -195,6 +195,12 @@ public class CQSSetQueueAttributesAction extends CQSAction {
             	queue.setCompressed(isCompressed);
                 postVars.put(CQSConstants.COL_COMPRESSED, value);
             	
+            } else if (attributeName.equals(CQSConstants.IS_ACTIVEACTIVE)) {
+            	
+            	boolean isActiveActive = Boolean.parseBoolean(value);
+            	queue.setActiveActive(isActiveActive);
+                postVars.put(CQSConstants.COL_ACTIVEACTIVE, value);
+            	
             } else {
                 throw new CMBException(CMBErrorCodes.InvalidAttributeName, "Attribute.Name: " + attributeName + " is not a valid attribute");
             }

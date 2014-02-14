@@ -91,6 +91,12 @@ public class CQSManageServiceAction extends CQSAction {
             writeResponse(out, response);
 			return true;
 			
+		} else if (task.equals("SetActiveSwitch")) {
+			CQSActiveActiveController.setActiveActiveSwitchRealTime(request.getParameter("Value"));
+	    	String out = CQSPopulator.getResponseMetadata();
+            writeResponse(out, response);
+	        return true;
+        
 		} else {
 			logger.error("event=cqs_manage_service error_code=invalid_task_parameter valid_values=ClearCache,ClearAPIStats,RemoveRecord");
 			throw new CMBException(CNSErrorCodes.InvalidParameterValue,"Request parameter Task is missing or invalid. Valid values are ClearQueues, ClearAPIStats, RemoveRecord.");

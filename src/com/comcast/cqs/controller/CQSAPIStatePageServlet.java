@@ -102,7 +102,17 @@ public class CQSAPIStatePageServlet extends AdminServletBase {
 				logger.error("event=failed_to_clear_queues", ex);
 				throw new ServletException(ex);
 			}
-		}
+		} else if (parameters.containsKey("setActiveActiveSwitch")) {
+			
+			try {
+				String url = CMBProperties.getInstance().getCQSServiceUrl() + "?Action=ManageService&Task=SetActiveSwitch&Value="+request.getParameter("activeactiveswitch")+"&AWSAccessKeyId=" + cnsAdminUser.getAccessKey();
+				httpGet(url);
+			} catch (Exception ex) {
+				logger.error("event=failed_to_set_activeactiveswitch", ex);
+				throw new ServletException(ex);
+			}
+	
+		} 
 		
 		out.println("<html>");
 		
@@ -184,6 +194,22 @@ public class CQSAPIStatePageServlet extends AdminServletBase {
 				}
 			}
 			
+			out.println("</table></span>");
+			
+			//table for Config
+			out.println("<h2 align='left'>CQS Configuration</h2>");
+			out.println("<span class='simple'><table border='1'>");
+			out.println("<tr>");
+			out.println("<td> Active Active Queue </td>");
+			out.println("<td>");
+			if(CQSActiveActiveController.getInstance().getActiveActiveSwitchRealTime()){
+				out.println("ON </td>");
+				out.println("<td><form action=\"\" method=\"POST\"><input type='hidden' name='activeactiveswitch' value='n'><input type='submit' value='Turn Off' name='setActiveActiveSwitch'/></form></td>");
+			}else {
+				out.println("OFF </td>");
+				out.println("<td><form action=\"\" method=\"POST\"><input type='hidden' name='activeactiveswitch' value='y'><input type='submit' value='Turn On' name='setActiveActiveSwitch'/></form></td>");
+			}
+			out.println("</tr>");
 			out.println("</table></span>");
 			
 			if (aggregateCallStats.keySet().size() > 0) {

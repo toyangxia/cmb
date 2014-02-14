@@ -98,6 +98,7 @@ public class CQSQueuePopulator extends CQSPopulator {
             out.append("\t\t").append(fillAttribute(CQSConstants.APPROXIMATE_NUMBER_OF_MESSAGES_NOTVISIBLE, "" + RedisCachedCassandraPersistence.getInstance().getQueueNotVisibleMessageCount(queue.getRelativeUrl(), true))).append("\n");
             out.append("\t\t").append(fillAttribute(CQSConstants.APPROXIMATE_NUMBER_OF_MESSAGES_DELAYED, "" + RedisCachedCassandraPersistence.getInstance().getQueueDelayedMessageCount(queue.getRelativeUrl(), true))).append("\n");
             out.append("\t\t").append(fillAttribute(CQSConstants.IS_COMPRESSED, "" + queue.isCompressed())).append("\n");
+            out.append("\t\t").append(fillAttribute(CQSConstants.IS_ACTIVEACTIVE, "" + queue.isActiveActive())).append("\n");
 
         } else {
         
@@ -141,12 +142,33 @@ public class CQSQueuePopulator extends CQSPopulator {
                 if (attributeName.equals(CQSConstants.IS_COMPRESSED)) {
                     out.append("\t\t").append(fillAttribute(attributeName, "" + queue.isCompressed())).append("\n");
                 }
+                if (attributeName.equals(CQSConstants.IS_ACTIVEACTIVE)) {
+                    out.append("\t\t").append(fillAttribute(attributeName, "" + queue.isActiveActive())).append("\n");
+                }
             }
         }
         
         out.append("\t</GetQueueAttributesResult>\n");
         out.append("\t").append(getResponseMetadata()).append("\n");
         out.append("</GetQueueAttributesResponse>").append("\n");
+        
+        return out.toString();
+    }
+    
+    public static String pollMessageIdsResponse(List<String> messageIds) throws Exception {
+        
+    	StringBuffer out = new StringBuffer("<PollMessageIdsResponse>\n");
+    	out.append("\t<PollMessageIdsResult>\n");
+
+        for (String messageId : messageIds) {
+        	out.append("\t\t<Message>\n");
+        	out.append("\t\t\t<MessageId>").append(messageId).append("</MessageId>\n");
+        	out.append("\t\t</Message>\n");
+        }
+        
+        out.append("\t</PollMessageIdsResult>\n");
+        out.append("\t").append(getResponseMetadata()).append("\n");
+        out.append("</PollMessageIdsResponse>").append("\n");
         
         return out.toString();
     }

@@ -17,8 +17,8 @@ package com.comcast.cqs.controller;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletException;
@@ -26,13 +26,15 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
+import org.w3c.dom.Element;
 
-import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
-import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.sqs.model.SetQueueAttributesRequest;
 import com.comcast.cmb.common.controller.AdminServletBase;
 import com.comcast.cmb.common.controller.CMBControllerServlet;
 import com.comcast.cmb.common.util.CMBProperties;
+import com.comcast.cmb.common.util.XmlUtil;
 import com.comcast.cqs.util.Util;
 
 public class CQSEditQueueAttributePage extends AdminServletBase {
@@ -71,6 +73,7 @@ public class CQSEditQueueAttributePage extends AdminServletBase {
 				String numberOfPartitions = request.getParameter("numberOfPartitions");
 				String numberOfShards = request.getParameter("numberOfShards");
 				String isCompressed =  request.getParameter("isCompressed");
+				String isActiveActive =  request.getParameter("isActiveActive");
 				
 				try {
 
@@ -107,6 +110,10 @@ public class CQSEditQueueAttributePage extends AdminServletBase {
 					if (isCompressed != null && !isCompressed.equals("")) {
 						attributes.put("IsCompressed", isCompressed);
 					}
+					
+					if (isActiveActive != null && !isActiveActive.equals("")) {
+						attributes.put("IsActiveActive", isActiveActive);
+					}
 
 					SetQueueAttributesRequest setQueueAttributesRequest = new SetQueueAttributesRequest(queueUrl, attributes);
 					sqs.setQueueAttributes(setQueueAttributesRequest);
@@ -130,16 +137,35 @@ public class CQSEditQueueAttributePage extends AdminServletBase {
 				String numberOfPartitions = "";
 				String numberOfShards = "";
 				String isCompressed = "";
+				String isActiveActive = "";
 				
 				if (queueUrl != null) {
 				
 					Map<String, String> attributes = null;
 					
 					try {
-						GetQueueAttributesRequest getQueueAttributesRequest = new GetQueueAttributesRequest(queueUrl);
-						getQueueAttributesRequest.setAttributeNames(Arrays.asList("VisibilityTimeout", "MaximumMessageSize", "MessageRetentionPeriod", "DelaySeconds", "ReceiveMessageWaitTimeSeconds", "NumberOfPartitions", "NumberOfShards", "IsCompressed"));
+/*						GetQueueAttributesRequest getQueueAttributesRequest = new GetQueueAttributesRequest(queueUrl);
+						getQueueAttributesRequest.setAttributeNames(Arrays.asList("VisibilityTimeout", "MaximumMessageSize", "MessageRetentionPeriod", "DelaySeconds", "ReceiveMessageWaitTimeSeconds", "NumberOfPartitions", "NumberOfShards", "IsCompressed", "IsActiveActive"));
 						GetQueueAttributesResult getQueueAttributesResult = sqs.getQueueAttributes(getQueueAttributesRequest);
-						attributes = getQueueAttributesResult.getAttributes();
+						attributes = getQueueAttributesResult.getAttributes();*/
+						
+						//get Queue Attributes by send URl
+						String getQueueAttributesRequestUrl = cqsServiceBaseUrl + user.getUserId() + "/" + queueName + "?Action=GetQueueAttributes&AttributeName.1=All&AWSAccessKeyId=" + user.getAccessKey();
+						AWSCredentials awsCredentials=new BasicAWSCredentials(user.getAccessKey(),user.getAccessSecret());
+						String getQueueAttributesXml = httpPOST(cqsServiceBaseUrl, getQueueAttributesRequestUrl,awsCredentials);
+						Element root = XmlUtil.buildDoc(getQueueAttributesXml);
+						List<Element> attributeElements = XmlUtil.getCurrentLevelChildNodes(XmlUtil.getCurrentLevelChildNodes(root, "GetQueueAttributesResult").get(0), "Attribute");
+						attributes= new HashMap<String, String>();
+						for (Element attribute : attributeElements) {
+							
+							String name = XmlUtil.getCurrentLevelTextValue(attribute, "Name");
+							String value = XmlUtil.getCurrentLevelTextValue(attribute, "Value");
+							
+							if (name != null && value != null) {
+								attributes.put(name, value);
+							}
+						}
+
 						visibilityTimeout = attributes.get("VisibilityTimeout");
 						maximumMessageSize = attributes.get("MaximumMessageSize");
 						messageRetentionPeriod = attributes.get("MessageRetentionPeriod");
@@ -148,6 +174,7 @@ public class CQSEditQueueAttributePage extends AdminServletBase {
 						numberOfPartitions = attributes.get("NumberOfPartitions");
 						numberOfShards = attributes.get("NumberOfShards");
 						isCompressed = attributes.get("IsCompressed");
+						isActiveActive = attributes.get("IsActiveActive");
 					} catch (Exception ex) {
 						logger.error("event=failed_to_get_attributes queue_url=" + queueUrl, ex);
 						throw new ServletException(ex);
@@ -185,6 +212,9 @@ public class CQSEditQueueAttributePage extends AdminServletBase {
 				out.println("<tr><td>&nbsp;</td><td><I><font color='grey'>Default 1, maximum 100 shards</font></I></td></tr>");
 
 				out.println("<tr><td>Compressed:</td><td><input type='text' name='isCompressed' size='50' value='" + isCompressed + "'></td></tr>");
+				out.println("<tr><td>&nbsp;</td><td><I><font color='grey'>Valid values: true or false</font></I></td></tr>");
+				
+				out.println("<tr><td>Active Active:</td><td><input type='text' name='isActiveActive' size='50' value='" + isActiveActive + "'></td></tr>");
 				out.println("<tr><td>&nbsp;</td><td><I><font color='grey'>Valid values: true or false</font></I></td></tr>");
 
 				out.println("<tr><td>&nbsp;</td><td>&nbsp;</td></tr>");

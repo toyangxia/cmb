@@ -79,6 +79,7 @@ public class CQSQueueCassandraPersistence extends CassandraPersistence implement
 		queueData.put(CQSConstants.COL_NUMBER_PARTITIONS, (new Long(queue.getNumberOfPartitions())).toString());
 		queueData.put(CQSConstants.COL_NUMBER_SHARDS, (new Long(queue.getNumberOfShards())).toString());
 		queueData.put(CQSConstants.COL_COMPRESSED, (new Boolean(queue.isCompressed())).toString());
+		queueData.put(CQSConstants.COL_ACTIVEACTIVE, (new Boolean(queue.isActiveActive())).toString());
 
 		insertOrUpdateRow(queue.getRelativeUrl(), COLUMN_FAMILY_QUEUES, queueData, CMBProperties.getInstance().getWriteConsistencyLevel());
 		
@@ -216,6 +217,7 @@ public class CQSQueueCassandraPersistence extends CassandraPersistence implement
 			long createdTime = (new Long(slice.getColumnByName(CQSConstants.COL_CREATED_TIME).getValue())).longValue();
 			String hostName = slice.getColumnByName(CQSConstants.COL_HOST_NAME) == null ? null : slice.getColumnByName(CQSConstants.COL_HOST_NAME).getValue();
 			boolean isCompressed = slice.getColumnByName(CQSConstants.COL_COMPRESSED) == null ? false : (new Boolean(slice.getColumnByName(CQSConstants.COL_COMPRESSED).getValue())).booleanValue();
+			boolean isActiveActive = slice.getColumnByName(CQSConstants.COL_ACTIVEACTIVE) == null ? false : (new Boolean(slice.getColumnByName(CQSConstants.COL_ACTIVEACTIVE).getValue())).booleanValue();
 			CQSQueue queue = new CQSQueue(name, ownerUserId);
 			queue.setRelativeUrl(url);
 			queue.setServiceEndpoint(hostName);
@@ -231,6 +233,7 @@ public class CQSQueueCassandraPersistence extends CassandraPersistence implement
 			queue.setNumberOfShards(numShards);
 			queue.setCreatedTime(createdTime);
 			queue.setCompressed(isCompressed);
+			queue.setActiveActive(isActiveActive);
 			return queue;
 		} catch (Exception ex) {
 			return null;

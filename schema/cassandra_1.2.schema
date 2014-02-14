@@ -406,4 +406,20 @@ create column family Users
     validation_class : UTF8Type},
     {column_name : 'description',
     validation_class : UTF8Type}];
-   
+ 
+ --
+-- GlobalConfig Column Family
+-- 
+-- global config
+--
+
+create column family GlobalConfig  
+  with column_type = 'Standard'
+  with caching = 'all'
+  and comparator = 'UTF8Type'
+  and default_validation_class = 'UTF8Type'
+  and key_validation_class = 'UTF8Type'
+  and read_repair_chance = 0
+  and dclocal_read_repair_chance = 0.05
+  and replicate_on_write = true
+  and compaction_strategy = 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy';  
