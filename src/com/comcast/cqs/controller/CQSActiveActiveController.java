@@ -26,9 +26,7 @@ public class CQSActiveActiveController {
     //thread pool for send poll message ID request
     public ExecutorService executor;
 	
-    private static volatile Map <String, Calendar> pollMessageIdTimeStampMap=new HashMap <String, Calendar>();
-    
-     
+   
 	//thread for check overall switch
     private CheckActiveActiveSwitchThread switchThread;
     private boolean switchFlag = false;
@@ -51,19 +49,7 @@ public class CQSActiveActiveController {
     	dcThread.start();
     }
     
-    
-    public void setPollMessageIdTimeStamp(String queueURL, Calendar calendar){
-    	pollMessageIdTimeStampMap.put(queueURL, calendar);
-    }
-    
-    public Calendar getPollMessageIdTimeStamp(String queueURL){
-    	return pollMessageIdTimeStampMap.get(queueURL);
-    }
-    
-    public void removePollMessageIdTimeStamp(String queueURL){
-    	pollMessageIdTimeStampMap.remove(queueURL);
-    }
-    
+   
     private class CheckActiveActiveSwitchThread extends Thread {
     	 public void run() {
     	while(true){

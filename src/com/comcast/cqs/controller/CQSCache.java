@@ -14,6 +14,7 @@ import com.comcast.cmb.common.util.PersistenceException;
 import com.comcast.cmb.common.util.ExpiringCache.CacheFullException;
 import com.comcast.cqs.model.CQSQueue;
 import com.comcast.cqs.persistence.ICQSQueuePersistence;
+import com.comcast.cqs.persistence.RedisCachedCassandraPersistence;
 import com.comcast.cqs.util.CQSErrorCodes;
 
 public class CQSCache {
@@ -34,6 +35,10 @@ public class CQSCache {
     	@Override
         public CQSQueue call() throws Exception {
             CQSQueue queue = queuePersistence.getQueue(queueUrl);
+            if(queue!=null){
+            	//the time stamp do not need sharded. 
+            	queue.setActiveActiveNextTimestamp(RedisCachedCassandraPersistence.getInstance().getQueueActiveActiveTimestamp(queue.getRelativeUrl(),0));
+            }
             return queue;
         }
     }

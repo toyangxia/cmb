@@ -58,7 +58,8 @@ public class CQSGetQueueAttributesAction extends CQSAction {
                 && !attribute.equals(CQSConstants.APPROXIMATE_NUMBER_OF_MESSAGES_NOTVISIBLE) 
                 && !attribute.equals(CQSConstants.APPROXIMATE_NUMBER_OF_MESSAGES_DELAYED) 
                 && !attribute.equals(CQSConstants.RECEIVE_MESSAGE_WAIT_TIME_SECONDS)
-                && !attribute.equals(CQSConstants.NUMBER_OF_PARTITIONS) && !attribute.equals(CQSConstants.NUMBER_OF_SHARDS) && !attribute.equals(CQSConstants.IS_COMPRESSED)) {
+                && !attribute.equals(CQSConstants.NUMBER_OF_PARTITIONS) && !attribute.equals(CQSConstants.NUMBER_OF_SHARDS) && !attribute.equals(CQSConstants.IS_COMPRESSED)
+                && !attribute.equals(CQSConstants.IS_ACTIVEACTIVE)) {
                 throw new CMBException(CMBErrorCodes.InvalidAttributeName, "Unknown attribute " + attribute);
             }
         }

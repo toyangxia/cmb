@@ -44,6 +44,7 @@ public class CQSQueue {
     private int numberOfShards = 1;
     private boolean compressed = false;
     private boolean activeActive = false;
+    private volatile long activeActiveNextTimestamp=0;
     
 	public CQSQueue(String name, String ownerId) {
     	
@@ -76,6 +77,14 @@ public class CQSQueue {
 
 	public void setActiveActive(boolean activeActive) {
 		this.activeActive = activeActive;
+	}
+	
+	public void setActiveActiveNextTimestamp(long activeActiveNextTimestamp) {
+		this.activeActiveNextTimestamp = activeActiveNextTimestamp;
+	}
+	
+	public long getActiveActiveNextTimestamp() {
+		return activeActiveNextTimestamp;
 	}
 
 	@Override 

@@ -15,14 +15,28 @@
  */
 package com.comcast.cmb.common.util;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
+
+import com.amazonaws.Request;
+import com.amazonaws.auth.AWS4Signer;
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.services.sqs.model.CreateQueueRequest;
+import com.amazonaws.services.sqs.model.transform.CreateQueueRequestMarshaller;
 
 /**
  * Utility functions 
@@ -181,4 +195,108 @@ public class Util {
         }
         return lofl;        
     }
+    
+    public static String httpGet(String urlString) {
+        
+    	URL url;
+    	HttpURLConnection conn;
+    	BufferedReader br;
+    	String line;
+    	String doc = "";
+
+    	try {
+
+    		url = new URL(urlString);
+    		conn = (HttpURLConnection)url.openConnection();
+    		conn.setRequestMethod("GET");
+    		br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+
+    		while ((line = br.readLine()) != null) {
+    			doc += line;
+    		}
+
+    		br.close();
+
+    		logger.info("event=http_get url=" + urlString);
+
+    	} catch (Exception ex) {
+    		logger.error("event=http_get url=" + urlString, ex);
+    	}
+
+    	return doc;
+    }
+
+public static String httpPOST(String baseUrl, String urlString, AWSCredentials awsCredentials) {
+    
+	URL url;
+	HttpURLConnection conn;
+	BufferedReader br;
+	String line;
+	String doc = "";
+
+	try {
+
+		String urlPost=urlString.substring(0,urlString.indexOf("?"));
+		url =new URL(urlPost);
+		conn = (HttpURLConnection)url.openConnection();
+		conn.setRequestMethod("POST");
+		
+		CreateQueueRequest createQueueRequest = new CreateQueueRequest("test");
+		Request<CreateQueueRequest> request = new CreateQueueRequestMarshaller().marshall(createQueueRequest);
+		//set parameters from url
+		String parameterString= urlString.substring(urlString.indexOf("?")+1);
+		String []parameterArray=parameterString.split("&");
+		Map <String, String> requestParameters=new HashMap<String, String>();
+		for(int i=0; i<parameterArray.length;i++){
+			requestParameters.put(parameterArray[i].substring(0,parameterArray[i].indexOf("=")), 
+					parameterArray[i].substring(parameterArray[i].indexOf("=")+1));
+		}
+		request.setParameters(requestParameters);
+		//get endpoint from url
+		URI uri = new URI(baseUrl);
+		request.setEndpoint(uri);
+		String resourcePath=urlString.substring(baseUrl.length(), urlString.indexOf("?"));
+		request.setResourcePath(resourcePath);
+		if(CMBProperties.getInstance().getEnableSignatureAuth()){
+			AWS4Signer aws4Signer=new AWS4Signer();
+			String host = uri.getHost();
+			aws4Signer.setServiceName(host);
+			aws4Signer.sign(request, awsCredentials);
+		}
+		//set headers for real request
+		for (Entry <String, String>entry:request.getHeaders().entrySet()){
+			conn.setRequestProperty(entry.getKey(),entry.getValue());	
+		}
+		
+		// Send post request
+		conn.setDoOutput(true);
+		DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
+		StringBuffer bodyStringBuffer=new StringBuffer();
+		for(Entry <String, String> entry:requestParameters.entrySet()){
+			bodyStringBuffer.append(entry.getKey()+"="+entry.getValue()+"&");
+		}
+		String bodyString="";
+		if(bodyStringBuffer.length()>0){
+			bodyString=bodyStringBuffer.substring(0, bodyStringBuffer.length()-1);
+		}
+		wr.writeBytes(bodyString);
+		wr.flush();
+		wr.close();
+		
+		br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+
+		while ((line = br.readLine()) != null) {
+			doc += line;
+		}
+
+		br.close();
+
+		logger.info("event=http_get url=" + urlString);
+
+	} catch (Exception ex) {
+		logger.error("event=http_get url=" + urlString, ex);
+	}
+
+	return doc;
+}
 }

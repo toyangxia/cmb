@@ -17,6 +17,7 @@ package com.comcast.cqs.controller;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,8 @@ import org.w3c.dom.Element;
 
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.services.sqs.model.GetQueueAttributesRequest;
+import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
 import com.amazonaws.services.sqs.model.SetQueueAttributesRequest;
 import com.comcast.cmb.common.controller.AdminServletBase;
 import com.comcast.cmb.common.controller.CMBControllerServlet;
@@ -144,28 +147,11 @@ public class CQSEditQueueAttributePage extends AdminServletBase {
 					Map<String, String> attributes = null;
 					
 					try {
-/*						GetQueueAttributesRequest getQueueAttributesRequest = new GetQueueAttributesRequest(queueUrl);
+						GetQueueAttributesRequest getQueueAttributesRequest = new GetQueueAttributesRequest(queueUrl);
 						getQueueAttributesRequest.setAttributeNames(Arrays.asList("VisibilityTimeout", "MaximumMessageSize", "MessageRetentionPeriod", "DelaySeconds", "ReceiveMessageWaitTimeSeconds", "NumberOfPartitions", "NumberOfShards", "IsCompressed", "IsActiveActive"));
 						GetQueueAttributesResult getQueueAttributesResult = sqs.getQueueAttributes(getQueueAttributesRequest);
-						attributes = getQueueAttributesResult.getAttributes();*/
+						attributes = getQueueAttributesResult.getAttributes();
 						
-						//get Queue Attributes by send URl
-						String getQueueAttributesRequestUrl = cqsServiceBaseUrl + user.getUserId() + "/" + queueName + "?Action=GetQueueAttributes&AttributeName.1=All&AWSAccessKeyId=" + user.getAccessKey();
-						AWSCredentials awsCredentials=new BasicAWSCredentials(user.getAccessKey(),user.getAccessSecret());
-						String getQueueAttributesXml = httpPOST(cqsServiceBaseUrl, getQueueAttributesRequestUrl,awsCredentials);
-						Element root = XmlUtil.buildDoc(getQueueAttributesXml);
-						List<Element> attributeElements = XmlUtil.getCurrentLevelChildNodes(XmlUtil.getCurrentLevelChildNodes(root, "GetQueueAttributesResult").get(0), "Attribute");
-						attributes= new HashMap<String, String>();
-						for (Element attribute : attributeElements) {
-							
-							String name = XmlUtil.getCurrentLevelTextValue(attribute, "Name");
-							String value = XmlUtil.getCurrentLevelTextValue(attribute, "Value");
-							
-							if (name != null && value != null) {
-								attributes.put(name, value);
-							}
-						}
-
 						visibilityTimeout = attributes.get("VisibilityTimeout");
 						maximumMessageSize = attributes.get("MaximumMessageSize");
 						messageRetentionPeriod = attributes.get("MessageRetentionPeriod");

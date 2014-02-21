@@ -194,6 +194,7 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
                 jedis.del("testQueue-0-F");
                 jedis.del("testQueue-0-V");
                 jedis.del("testQueue-0-VR");
+                jedis.del("testQueue-0-ATM");
             } finally {
                 returnResource(jedis);
             }
@@ -563,6 +564,7 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
      *  <Q>-VR = the sentinel flag the absence of which implies its time to process the delayed set.
      *  <Q>-A-<messageId> = The attributes for a message in a queue. Note, this requires that the messageId remain the same
      *    throughout the life-time of a message.
+     *  <Q>-ATM = the timestamp for the active active next run.  
      */
     private class CacheFiller implements Runnable {
         final String queueUrl;
@@ -1330,6 +1332,8 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
                 logger.debug("num removed=" + num);
                 num = jedis.del(queueUrl + "-" + shard + "-VR");
                 logger.debug("num removed=" + num);
+                num = jedis.del(queueUrl + "-" + shard + "-ATM");
+                logger.debug("num removed=" + num);
                 long ts2 = System.currentTimeMillis();
                 CQSControllerServlet.valueAccumulator.addToCounter(AccumulatorName.RedisTime, (ts2 - ts1));
                 logger.debug("event=cleared_queue queue_url=" + queueUrl + " shard=" + shard);
@@ -1552,8 +1556,9 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
             	boolean emptyQueue = false;
                 
                 String memId;
-                for (int i = 0; i < maxNumIds && !emptyQueue; i++) {
-                	memId = jedis.lpop(queue.getRelativeUrl() + "-" + shard + "-Q");
+                String key = queue.getRelativeUrl() + "-" + shard + "-Q";
+                for (int i = 0; !emptyQueue && i < maxNumIds; i++) {
+                	memId = jedis.lpop(key);
                     if (memId == null || memId.equals("nil")) { //done
                         emptyQueue = true;
                     } else {
@@ -1824,10 +1829,10 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
 			boolean brokenJedis =false;
 			try{
 				jedis = getResource();
-			
-			for (String memId : messageIdList){
-				jedis.rpush(queue.getRelativeUrl() + "-" + shard + "-Q", memId);
-			}
+				String key = queue.getRelativeUrl() + "-" + shard + "-Q";
+				for (String memId : messageIdList){
+					jedis.rpush(key, memId);
+				}
 			}catch (JedisConnectionException e) {
 	            logger.warn("event=set_message error_code=redis_unavailable num_connections=" + numRedisConnections.get());
 	            brokenJedis = true;
@@ -1839,4 +1844,50 @@ public class RedisCachedCassandraPersistence implements ICQSMessagePersistence, 
 	        }
 		}
 	}
+    public long getQueueActiveActiveTimestamp(String queueUrl, int shard) throws Exception {
+            long ts1 = System.currentTimeMillis();
+            long ts2 = 0;
+            boolean brokenJedis = false;
+            ShardedJedis jedis = getResource();
+            long result=0;
+            String resultString;
+            //-ATM is for queue active active next run time stamp
+            String key=queueUrl + "-" + shard + "-ATM";
+            try {
+            	resultString=jedis.get(key);
+            } catch (JedisException e) {
+                brokenJedis = true;
+                throw e;
+            } finally {
+                returnResource(jedis, brokenJedis);
+                if (ts2 == 0) ts2 = System.currentTimeMillis();
+                CQSControllerServlet.valueAccumulator.addToCounter(AccumulatorName.RedisTime, (ts2 - ts1));
+            }    
+            
+            if(resultString==null || resultString.equals("nil")){
+            	return result;
+            }
+            result= Long.parseLong(resultString);
+            return result;
+    
+    }
+    
+    public void setQueueActiveActiveTimestamp(String queueUrl, int shard, long nextTimeStamp) throws Exception {
+        long ts1 = System.currentTimeMillis();
+        long ts2 = 0;
+        boolean brokenJedis = false;
+        ShardedJedis jedis = getResource();
+        //-ATM is for queue active active next run time stamp
+        String key=queueUrl + "-" + shard + "-ATM";
+        try {
+        	jedis.set(key, String.valueOf(nextTimeStamp));
+        } catch (JedisException e) {
+            brokenJedis = true;
+            throw e;
+        } finally {
+            returnResource(jedis, brokenJedis);
+            if (ts2 == 0) ts2 = System.currentTimeMillis();
+            CQSControllerServlet.valueAccumulator.addToCounter(AccumulatorName.RedisTime, (ts2 - ts1));
+        }    
+    }
 }

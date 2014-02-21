@@ -173,24 +173,17 @@ public class CQSReceiveMessageAction extends CQSAction {
 		// than n seconds, kick async call to poll message ID from other Data
 		// center
 		try {
-			if (CQSActiveActiveController.getInstance().getActiveActiveSwitch()) {
-				int activeActiveFrequencySeconds = CMBProperties.getInstance()
-						.getActiveActiveFrequencySeconds();
-				Calendar calendarMinusFrequencySec = Calendar.getInstance();
-				calendarMinusFrequencySec.add(Calendar.SECOND,
-						0 - activeActiveFrequencySeconds);
-				Calendar lastPollMessageIdTimestamp = CQSActiveActiveController
-						.getInstance().getPollMessageIdTimeStamp(
-								queue.getRelativeUrl());
-				if ((lastPollMessageIdTimestamp == null)
-						|| ((queue.isActiveActive()) && (lastPollMessageIdTimestamp
-								.before(calendarMinusFrequencySec)))) {
+			if (CQSActiveActiveController.getInstance().getActiveActiveSwitch()&&queue.isActiveActive()) {
+				Long nextPollMessageIdTimestamp = queue.getActiveActiveNextTimestamp();
+				if ((nextPollMessageIdTimestamp == 0)|| (System.currentTimeMillis()>nextPollMessageIdTimestamp)) {
 					// kick async calls
 					CQSActiveActiveController.getInstance().executor
 							.submit(new PollMessageIdsRunnable(queue, user));
-					CQSActiveActiveController.getInstance()
-							.setPollMessageIdTimeStamp(queue.getRelativeUrl(),
-									Calendar.getInstance());
+					//set queue time stamp and set Redis time stamp
+					long newNextTimeStamp=System.currentTimeMillis()+
+							CMBProperties.getInstance().getActiveActiveFrequencySeconds()*1000;
+					queue.setActiveActiveNextTimestamp(newNextTimeStamp);
+					RedisCachedCassandraPersistence.getInstance().setQueueActiveActiveTimestamp(queue.getRelativeUrl(), 0, newNextTimeStamp);
 				}
 			}
 		} catch (Exception e) {
@@ -213,24 +206,21 @@ public class CQSReceiveMessageAction extends CQSAction {
 	    	int maxNumIds = CMBProperties.getInstance().getPollMessageIdsMaxNum();
 	    	try{
 	    		int localQueueDepth = (int)RedisCachedCassandraPersistence.getInstance().getQueueMessageCount(queue.getRelativeUrl(), true);
-
+	    		int messageNum;
 	    		//kick the call
 		    		for(String cqsRemoteDatacenterUrl:CQSActiveActiveController.getInstance().getOtherDcURLs()){
 						String pollMessageIdsRequestUrl = cqsRemoteDatacenterUrl + queue.getRelativeUrl()+ "?Action=PollMessageIds&MaxNumIds="+maxNumIds+"&LocalQueueDepth="+localQueueDepth+"&AWSAccessKeyId=" + user.getAccessKey();
 						AWSCredentials awsCredentials=new BasicAWSCredentials(user.getAccessKey(),user.getAccessSecret());
-						String pollMessageIdXml = httpPOST(cqsRemoteDatacenterUrl, pollMessageIdsRequestUrl,awsCredentials);
+						String pollMessageIdXml = com.comcast.cmb.common.util.Util.httpPOST(cqsRemoteDatacenterUrl, pollMessageIdsRequestUrl,awsCredentials);
 						Element root = XmlUtil.buildDoc(pollMessageIdXml);
 						List<Element> messageIdElements = XmlUtil.getCurrentLevelChildNodes(XmlUtil.getCurrentLevelChildNodes(root, "PollMessageIdsResult").get(0), "Message");
 						List <String> messageIdList= new LinkedList<String>();
 						for (Element messageIdElement : messageIdElements) {
 							messageIdList.add(XmlUtil.getCurrentLevelTextValue(messageIdElement, "MessageId"));
 						}
-
-						StringBuffer sb=new StringBuffer();
-						for (String messageId: messageIdList){
-							sb.append(messageId+ ",");
-						}
-						logger.info("event=pollmessageid_returned result:"+sb);
+						messageNum=(messageIdList==null?0:messageIdList.size());
+						logger.info("event=pollmessageid_returned remotedatacenterURL="+cqsRemoteDatacenterUrl+" number_of_messageid="
+								+messageNum);
 						//if not null, add to Redis
 						if (messageIdList.size()>0){
 							RedisCachedCassandraPersistence.getInstance().setMessageIds(queue, messageIdList);
@@ -241,80 +231,6 @@ public class CQSReceiveMessageAction extends CQSAction {
 	    	}
 	    	//call remote Data center load balancer
 	    	//add result to current Redis
-	    }
-
-	    protected String httpPOST(String baseUrl, String urlString, AWSCredentials awsCredentials) {
-	        
-	    	URL url;
-	    	HttpURLConnection conn;
-	    	BufferedReader br;
-	    	String line;
-	    	String doc = "";
-
-	    	try {
-
-	    		String urlPost=urlString.substring(0,urlString.indexOf("?"));
-	    		url =new URL(urlPost);
-	    		conn = (HttpURLConnection)url.openConnection();
-	    		conn.setRequestMethod("POST");
-	    		
-	    		CreateQueueRequest createQueueRequest = new CreateQueueRequest("test");
-	    		Request<CreateQueueRequest> request = new CreateQueueRequestMarshaller().marshall(createQueueRequest);
-	    		//set parameters from url
-	    		String parameterString= urlString.substring(urlString.indexOf("?")+1);
-	    		String []parameterArray=parameterString.split("&");
-	    		Map <String, String> requestParameters=new HashMap<String, String>();
-	    		for(int i=0; i<parameterArray.length;i++){
-	    			requestParameters.put(parameterArray[i].substring(0,parameterArray[i].indexOf("=")), 
-	    					parameterArray[i].substring(parameterArray[i].indexOf("=")+1));
-	    		}
-	    		request.setParameters(requestParameters);
-	    		//get endpoint from url
-	    		URI uri = new URI(baseUrl);
-	    		request.setEndpoint(uri);
-	    		String resourcePath=urlString.substring(baseUrl.length(), urlString.indexOf("?"));
-	    		request.setResourcePath(resourcePath);
-	    		
-	    		AWS4Signer aws4Signer=new AWS4Signer();
-	    		String host = uri.getHost();
-	    		aws4Signer.setServiceName(host);
-	    		aws4Signer.sign(request, awsCredentials);
-	    		
-	    		//set headers for real request
-	    		for (Entry <String, String>entry:request.getHeaders().entrySet()){
-	    			conn.setRequestProperty(entry.getKey(),entry.getValue());	
-	    		}
-	    		
-	    		// Send post request
-	    		conn.setDoOutput(true);
-	    		DataOutputStream wr = new DataOutputStream(conn.getOutputStream());
-	    		StringBuffer bodyStringBuffer=new StringBuffer();
-	    		for(Entry <String, String> entry:requestParameters.entrySet()){
-	    			bodyStringBuffer.append(entry.getKey()+"="+entry.getValue()+"&");
-	    		}
-	    		String bodyString="";
-	    		if(bodyStringBuffer.length()>0){
-	    			bodyString=bodyStringBuffer.substring(0, bodyStringBuffer.length()-1);
-	    		}
-	    		wr.writeBytes(bodyString);
-	    		wr.flush();
-	    		wr.close();
-	    		
-	    		br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-
-	    		while ((line = br.readLine()) != null) {
-	    			doc += line;
-	    		}
-
-	    		br.close();
-
-	    		logger.info("event=http_get url=" + urlString);
-
-	    	} catch (Exception ex) {
-	    		logger.error("event=http_get url=" + urlString, ex);
-	    	}
-
-	    	return doc;
 	    }
 	}
 

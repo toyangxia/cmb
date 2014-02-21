@@ -57,19 +57,19 @@ public class CQSPollMessageIdsAction extends CQSAction {
         //generate response 
         String out = CQSQueuePopulator.pollMessageIdsResponse(messageIds);
         writeResponse(out, response);
-		StringBuffer sb=new StringBuffer();
-		for (String messageId: messageIds){
-			sb.append(messageId+ ",");
-		}
-		logger.info("event=pollmessageid_send result:"+sb);
+        int messageNum=messageIds==null?0:messageIds.size();
+		logger.info("event=pollmessageid_send remotedatacenterURL="+request.getRemoteAddr()+" number_of_messageid="+messageNum);
         if(messageIds==null || messageIds.isEmpty()){
         	return false;
         }else {
         	//This is for active active queue. if this data center just send out some message id, 
         	//it will not send poll message id request for n seconds.
-        	Calendar currentCalander=Calendar.getInstance();
-        	currentCalander.add(Calendar.SECOND, CMBProperties.getInstance().getActiveActiveFrequencySeconds()*10);
-        	CQSActiveActiveController.getInstance().setPollMessageIdTimeStamp(queue.getRelativeUrl(), currentCalander);
+
+        	//set queue time stamp and set Redis time stamp
+			long newNextTimeStamp=System.currentTimeMillis()+
+					CMBProperties.getInstance().getActiveActiveFrequencySeconds()*1000*10;
+			queue.setActiveActiveNextTimestamp(newNextTimeStamp);
+			RedisCachedCassandraPersistence.getInstance().setQueueActiveActiveTimestamp(queue.getRelativeUrl(), 0, newNextTimeStamp);
         	return true;
         }
 	}

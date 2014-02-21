@@ -141,7 +141,7 @@ public class CQSQueueMessagesPageServlet extends AdminServletBase {
         	numberOfShards = Integer.parseInt(attributes.get("NumberOfShards"));
 			
 		} catch (Exception ex) {
-			logger.error("event=get_queue_attributes url=" + queueUrl +ex);
+			logger.error("event=get_queue_attributes url=" + queueUrl +" exception="+ex);
 		}
 		
 		out.println("<html>");

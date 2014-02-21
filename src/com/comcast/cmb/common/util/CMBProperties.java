@@ -302,10 +302,10 @@ public class CMBProperties {
             cnsServiceEnabled = Boolean.parseBoolean(props.getProperty("cmb.cns.serviceEnabled", "true"));
             cqsServiceEnabled = Boolean.parseBoolean(props.getProperty("cmb.cqs.serviceEnabled", "true"));
             
-            activeActiveFrequencySeconds = Integer.parseInt(props.getProperty("cmb.cqs.activeActiveFrequencySeconds", "10"));
-            pollMessageIdsMaxNum = Integer.parseInt(props.getProperty("cmb.cqs.pollMessageIdsMaxNum", "10"));
-            activeActivePoolSize = Integer.parseInt(props.getProperty("cmb.cqs.activeActivePoolSize", "10"));
-            activeSwitchCheckFrequencySeconds = Integer.parseInt(props.getProperty("cmb.cqs.activeSwitchCheckFrequencySeconds", "60"));
+            activeActiveFrequencySeconds = Integer.parseInt(props.getProperty("cmb.cqs.activeactive.FrequencySeconds", "10"));
+            pollMessageIdsMaxNum = Integer.parseInt(props.getProperty("cmb.cqs.activeactive.pollMessageIdsMaxNum", "10"));
+            activeActivePoolSize = Integer.parseInt(props.getProperty("cmb.cqs.activeactive.PoolSize", "10"));
+            activeSwitchCheckFrequencySeconds = Integer.parseInt(props.getProperty("cmb.cqs.activeactive.SwitchCheckFrequencySeconds", "60"));
             
             cnsMaxMsgSize = Integer.parseInt(props.getProperty("cmb.cns.maxMsgSize", "65536"));
             
